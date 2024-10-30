@@ -1,11 +1,8 @@
 package team
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/urfave/cli/v2"
 	"github.com/yourusername/lockbox/internal/git"
@@ -130,7 +127,7 @@ func removeCommand() *cli.Command {
 				return err
 			}
 
-			 := crypto.NewKeyManager(filepath.Join(gitRoot, ".lockbox"))
+			km := crypto.NewKeyManager(filepath.Join(gitRoot, ".lockbox"))
 
 			if err := km.RemoveTeamKey(c.String("key")); err != nil {
 				return err
