@@ -10,6 +10,8 @@ packages = [{ include = "lockbox", from = "src" }]
 python = "^3.12"
 click = "^8.1.7"
 gnupg = "^2.3.1"
+python-gnupg = "^0.5.1"
+types-gnupg = "^0.1.5"
 
 [tool.poetry.scripts]
 lockbox = "lockbox.main:lockbox"

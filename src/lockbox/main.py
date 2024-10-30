@@ -1,6 +1,7 @@
 import click
 import tomllib
 from pathlib import Path
+from .commands.team.team import team
 
 
 def get_version():
@@ -19,23 +20,25 @@ def lockbox():
 
 @lockbox.command()
 def init():
-    """Initialize a .gpg directory in the git project root."""
+    """Initialize a .lockbox directory in the git project root."""
     # Find git root by walking up directories looking for .git
     current = Path.cwd()
     while current != current.parent:
         if (current / ".git").exists():
-            gpg_dir = current / ".gpg"
-            if not gpg_dir.exists():
-                gpg_dir.mkdir()
-                click.echo(f"Created GPG directory at {gpg_dir}")
+            lockbox_dir = current / ".lockbox"
+            if not lockbox_dir.exists():
+                lockbox_dir.mkdir()
+                click.echo(f"Created Lockbox directory at '{lockbox_dir}'")
             else:
-                click.echo(f"GPG directory already exists at {gpg_dir}")
+                click.echo(f"Lockbox directory already exists at '{lockbox_dir}'")
             return
         current = current.parent
 
     click.echo("Error: Not in a git repository", err=True)
     raise click.Abort()
 
+
+lockbox.add_command(team)
 
 if __name__ == "__main__":
     lockbox()
