@@ -1,0 +1,23 @@
+name: Update Homebrew
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update Homebrew formula
+        uses: dawidd6/action-homebrew-bump-formula@v3
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          tap: yourusername/homebrew-tap
+          formula: lockbox
+          tag: ${{ github.ref }}
+          revision: ${{ github.sha }} 
