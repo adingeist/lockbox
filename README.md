@@ -1,13 +1,13 @@
 # Lockbox
 
-Lockbox is a command-line tool for managing team GPG keys in Git repositories. It provides a secure way to share and manage GPG public keys within a team, storing them in a `.lockbox` directory at the root of your Git repository.
+Lockbox is a command-line tool for securely sharing secrets within a team. It uses modern encryption (age) to ensure only team members can decrypt shared secrets.
 
 ## Features
 
-- Easy team member key management
-- Interactive key selection
-- Secure key storage in Git repository
-- Support for multiple GPG keys per user
+- Built-in encryption (no external GPG required)
+- Team member key management
+- Secure secret sharing
+- Git repository integration
 - Cross-platform support (Linux, macOS, Windows)
 
 ## Installation
@@ -24,7 +24,7 @@ Download the appropriate binary for your platform from the [releases page](https
 
 ## Usage
 
-### Initialize Lockbox
+### Initialize Repository
 
 Create a `.lockbox` directory in your Git repository:
 
@@ -32,75 +32,138 @@ Create a `.lockbox` directory in your Git repository:
 lockbox init
 ```
 
-### Team Management Commands
+### Set Up Your Identity
 
-#### Add a Team Member
-
-```bash
-# Interactive mode
-lockbox team add
-
-# Add your own public key
-lockbox team add --me
-
-# Add from a file
-lockbox team add --file path/to/key.asc
-
-# Add by key ID
-lockbox team add --id ABC123
-
-# Add by fingerprint
-lockbox team add --fingerprint ABC123...
-```
-
-#### Remove a Team Member
+Before you can encrypt or decrypt secrets, you need to set up your identity:
 
 ```bash
-# Interactive mode
-lockbox team remove
-
-# Remove your own key
-lockbox team remove --me
-
-# Remove by key ID
-lockbox team remove --id ABC123
-
-# Remove by fingerprint
-lockbox team remove --fingerprint ABC123...
+lockbox team init --name "Your Name"
 ```
 
-#### List Team Members
+This will:
+- Generate your key pair
+- Store your private key locally
+- Add your public key to the team
 
+### Team Management
+
+Add a team member:
+```bash
+lockbox team add --name "Team Member" --key "age1..."
+```
+
+Remove a team member:
+```bash
+lockbox team remove --key "age1..."
+```
+
+List team members:
 ```bash
 lockbox team list
 ```
+
+### Encrypting and Decrypting Secrets
+
+(Coming soon)
 
 ## Development
 
 ### Prerequisites
 
 - Go 1.21 or later
-- `libgpgme-dev` (Linux) or `gpgme` (macOS)
+- Make
 
-### Building from Source
+### Setting Up Development Environment
 
+1. Clone the repository:
 ```bash
-# Clone the repository
 git clone https://github.com/yourusername/lockbox.git
 cd lockbox
-
-# Build
-make build
-
-# Install locally
-make install
 ```
 
-### Running Tests
+2. Install dependencies:
+```bash
+go mod download
+```
+
+3. Build the project:
+```bash
+make build
+```
+
+The binary will be available in `bin/lockbox`.
+
+### Development Commands
 
 ```bash
+# Build the project
+make build
+
+# Run tests
 make test
+
+# Run linter
+make lint
+
+# Clean build artifacts
+make clean
+
+# Build for all platforms
+make build-all
 ```
+
+### Project Structure
+
+```
+lockbox/
+├── cmd/                    # Application entrypoints
+│   └── lockbox/           # Main CLI application
+├── internal/              # Private application code
+│   ├── crypto/           # Encryption operations
+│   ├── git/              # Git utilities
+│   └── commands/         # CLI commands
+├── .github/              # GitHub Actions workflows
+└── Formula/              # Homebrew formula
+```
+
+### Making Changes
+
+1. Create a new branch:
+```bash
+git checkout -b feature/your-feature
+```
+
+2. Make your changes and test:
+```bash
+make build
+./bin/lockbox --help
+```
+
+3. Run tests and linter:
+```bash
+make test
+make lint
+```
+
+4. Commit and push:
+```bash
+git commit -m "Add your feature"
+git push origin feature/your-feature
+```
+
+### Release Process
+
+1. Tag a new version:
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+2. GitHub Actions will automatically:
+- Run tests
+- Build binaries for all platforms
+- Create a GitHub release
+- Update the Homebrew formula
 
 ## Contributing
 
