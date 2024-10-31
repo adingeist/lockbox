@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"filippo.io/age"
@@ -15,39 +14,127 @@ import (
 type Identity struct {
 	Name       string
 	PublicKey  string
-	PrivateKey string // Only set for the user's own key
+	PrivateKey string // Only set for personal keys
 }
 
 type KeyManager struct {
-	lockboxDir string
+	globalDir string // ~/.lockbox
+	localDir  string // ./.lockbox
 }
 
-func NewKeyManager(lockboxDir string) *KeyManager {
-	return &KeyManager{
-		lockboxDir: lockboxDir,
+func NewKeyManager() (*KeyManager, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
+
+	globalDir := filepath.Join(homeDir, ".lockbox")
+	if err := os.MkdirAll(globalDir, 0700); err != nil {
+	return nil, fmt.Errorf("failed to create global key directory: %w", err)
+	}
+
+	return &KeyManager{
+		globalDir: globalDir,
+	}, nil
 }
 
-// GenerateKeyPair creates a new key pair
+func (km *KeyManager) SetLocalDir(dir string) {
+	km.localDir = dir
+}
+
+// Personal key management
 func (km *KeyManager) GenerateKeyPair(name string) (*Identity, error) {
 	identity, err := age.GenerateX25519Identity()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key pair: %w", err)
 	}
 
-	return &Identity{
+	id := &Identity{
 		Name:       name,
 		PublicKey:  identity.Recipient().String(),
 		PrivateKey: identity.String(),
-	}, nil
+	}
+
+	if err := km.savePersonalKey(id); err != nil {
+		return nil, err
+	}
+
+	return id, nil
 }
 
-// SaveTeamKey saves a public key to the team keyring
+func (km *KeyManager) savePersonalKey(identity *Identity) error {
+	keysDir := filepath.Join(km.globalDir, "keys")
+	if err := os.MkdirAll(keysDir, 0700); err != nil {
+		return fmt.Errorf("failed to create keys directory: %w", err)
+	}
+
+	data, err := json.Marshal(identity)
+	if err != nil {
+		return fmt.Errorf("failed to marshal identity: %w", err)
+	}
+
+	keyPath := filepath.Join(keysDir, fmt.Sprintf("%s.json", identity.Name))
+	return os.WriteFile(keyPath, data, 0600)
+}
+
+func (km *KeyManager) getPersonalKey(name string) (*Identity, error) {
+	keyPath := filepath.Join(km.globalDir, "keys", fmt.Sprintf("%s.json", name))
+	data, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read key file: %w", err)
+	}
+
+	var identity Identity
+	if err := json.Unmarshal(data, &identity); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal identity: %w", err)
+	}
+
+	return &identity, nil
+}
+
+func (km *KeyManager) ListPersonalKeys() ([]Identity, error) {
+	keysDir := filepath.Join(km.globalDir, "keys")
+	entries, err := os.ReadDir(keysDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read keys directory: %w", err)
+	}
+
+	var identities []Identity
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
+			data, err := os.ReadFile(filepath.Join(keysDir, entry.Name()))
+			if err != nil {
+				continue
+			}
+			var id Identity
+			if err := json.Unmarshal(data, &id); err != nil {
+				continue
+			}
+			identities = append(identities, id)
+		}
+	}
+
+	return identities, nil
+}
+
+func (km *KeyManager) RemovePersonalKey(name string) error {
+	keyPath := filepath.Join(km.globalDir, "keys", fmt.Sprintf("%s.json", name))
+	return os.Remove(keyPath)
+}
+
+// Team key management
 func (km *KeyManager) SaveTeamKey(identity *Identity) error {
-	keysFile := filepath.Join(km.lockboxDir, "keys.txt")
+	if km.localDir == "" {
+		return fmt.Errorf("no local directory set")
+	}
+
+	keysFile := filepath.Join(km.localDir, "team-keys.txt")
 	f, err := os.OpenFile(keysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open keys file: %w", err)
+		return fmt.Errorf("failed to open team keys file: %w", err)
 	}
 	defer f.Close()
 
@@ -55,59 +142,32 @@ func (km *KeyManager) SaveTeamKey(identity *Identity) error {
 	return err
 }
 
-// RemoveTeamKey removes a public key from the team keyring
-func (km *KeyManager) RemoveTeamKey(publicKey string) error {
-	keysFile := filepath.Join(km.lockboxDir, "keys.txt")
-	input, err := os.ReadFile(keysFile)
-	if err != nil {
-		return fmt.Errorf("failed to read keys file: %w", err)
-	}
-
-	var output []string
-	scanner := bufio.NewScanner(bytes.NewReader(input))
-	skip := false
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "#") {
-			if skip {
-				skip = false
-				continue
-			}
-			output = append(output, line)
-		} else {
-			if line == publicKey {
-				skip = true
-				continue
-			}
-			if !skip {
-				output = append(output, line)
-			}
-		}
-	}
-
-	return os.WriteFile(keysFile, []byte(strings.Join(output, "\n")+"\n"), 0644)
-}
-
-// ListTeamKeys returns all public keys in the team keyring
 func (km *KeyManager) ListTeamKeys() ([]Identity, error) {
-	keysFile := filepath.Join(km.lockboxDir, "keys.txt")
-	f, err := os.Open(keysFile)
+	if km.localDir == "" {
+		return nil, fmt.Errorf("no local directory set")
+	}
+
+	keysFile := filepath.Join(km.localDir, "team-keys.txt")
+	data, err := os.ReadFile(keysFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to open keys file: %w", err)
+		return nil, fmt.Errorf("failed to read team keys file: %w", err)
 	}
-	defer f.Close()
 
 	var identities []Identity
 	var currentName string
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
 		if strings.HasPrefix(line, "#") {
 			currentName = strings.TrimSpace(strings.TrimPrefix(line, "#"))
-		} else if line != "" {
+		} else {
 			identities = append(identities, Identity{
 				Name:      currentName,
 				PublicKey: line,
@@ -116,6 +176,40 @@ func (km *KeyManager) ListTeamKeys() ([]Identity, error) {
 	}
 
 	return identities, nil
+}
+
+// File encryption/decryption
+func (km *KeyManager) EncryptFile(inputPath string, outputPath string) error {
+	data, err := os.ReadFile(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to read input file: %w", err)
+	}
+
+	encrypted, err := km.Encrypt(data)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(outputPath, encrypted, 0644)
+}
+
+func (km *KeyManager) DecryptFile(inputPath string, outputPath string, keyName string) error {
+	data, err := os.ReadFile(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to read encrypted file: %w", err)
+	}
+
+	identity, err := km.getPersonalKey(keyName)
+	if err != nil {
+		return err
+	}
+
+	decrypted, err := km.Decrypt(data, identity.PrivateKey)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(outputPath, decrypted, 0644)
 }
 
 // Encrypt encrypts data for all team members
@@ -177,7 +271,7 @@ func (km *KeyManager) Decrypt(data []byte, privateKey string) ([]byte, error) {
 
 // SavePrivateKey saves the user's private key
 func (km *KeyManager) SavePrivateKey(identity *Identity) error {
-	keyFile := filepath.Join(km.lockboxDir, "private.key")
+	keyFile := filepath.Join(km.localDir, "private.key")
 	data, err := json.Marshal(identity)
 	if err != nil {
 		return fmt.Errorf("failed to marshal identity: %w", err)
@@ -187,7 +281,7 @@ func (km *KeyManager) SavePrivateKey(identity *Identity) error {
 
 // LoadPrivateKey loads the user's private key
 func (km *KeyManager) LoadPrivateKey() (*Identity, error) {
-	keyFile := filepath.Join(km.lockboxDir, "private.key")
+	keyFile := filepath.Join(km.localDir, "private.key")
 	data, err := os.ReadFile(keyFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -202,4 +296,55 @@ func (km *KeyManager) LoadPrivateKey() (*Identity, error) {
 	}
 
 	return &identity, nil
+}
+
+func (km *KeyManager) RemoveTeamKey(publicKey string) error {
+	if km.localDir == "" {
+		return fmt.Errorf("no local directory set")
+	}
+
+	keysFile := filepath.Join(km.localDir, "team-keys.txt")
+	data, err := os.ReadFile(keysFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read team keys file: %w", err)
+	}
+
+	var lines []string
+	var skipNext bool
+
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "#") {
+			if !skipNext {
+				lines = append(lines, line)
+			}
+			skipNext = false
+		} else {
+			if line == publicKey {
+				skipNext = true
+				continue
+			}
+			if !skipNext {
+				lines = append(lines, line)
+			}
+		}
+	}
+
+	if len(lines) == 0 {
+		return os.Remove(keysFile)
+	}
+
+	var buf bytes.Buffer
+	for _, line := range lines {
+		buf.WriteString(line)
+		buf.WriteString("\n")
+	}
+
+	return os.WriteFile(keysFile, buf.Bytes(), 0644)
 } 

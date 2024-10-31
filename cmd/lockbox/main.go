@@ -9,12 +9,14 @@ import (
 	"github.com/yourusername/lockbox/internal/git"
 	"github.com/yourusername/lockbox/internal/version"
 	"github.com/yourusername/lockbox/internal/commands/team"
+	"github.com/yourusername/lockbox/internal/commands/key"
+	"github.com/yourusername/lockbox/internal/commands/secret"
 )
 
 func main() {
 	app := &cli.App{
 		Name:    "lockbox",
-		Usage:   "Manage team GPG keys in git repositories",
+		Usage:   "Secure team secret management",
 		Version: version.Version,
 		Commands: []*cli.Command{
 			{
@@ -35,7 +37,9 @@ func main() {
 					return nil
 				},
 			},
+			key.Command(),
 			team.Command(),
+			secret.Command(),
 		},
 	}
 

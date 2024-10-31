@@ -4,9 +4,10 @@ Lockbox is a command-line tool for securely sharing secrets within a team. It us
 
 ## Features
 
-- Built-in encryption (no external GPG required)
+- Built-in encryption (no external dependencies)
 - Team member key management
-- Secure secret sharing
+- Personal key management across repositories
+- Interactive command-line interface
 - Git repository integration
 - Cross-platform support (Linux, macOS, Windows)
 
@@ -32,29 +33,41 @@ Create a `.lockbox` directory in your Git repository:
 lockbox init
 ```
 
-### Set Up Your Identity
+### Managing Personal Keys
 
-Before you can encrypt or decrypt secrets, you need to set up your identity:
+Your personal keys are stored in `~/.lockbox` and can be used across multiple repositories.
 
+Create a new key:
 ```bash
-lockbox team init --name "Your Name"
+lockbox key add
+# Follow the interactive prompts
 ```
 
-This will:
-- Generate your key pair
-- Store your private key locally
-- Add your public key to the team
+List your keys:
+```bash
+lockbox key list
+```
+
+Remove a key:
+```bash
+lockbox key remove
+# Select key to remove from the list
+```
 
 ### Team Management
 
 Add a team member:
 ```bash
-lockbox team add --name "Team Member" --key "age1..."
+lockbox team add
+# Choose to add from:
+# 1. Your personal keys
+# 2. A public key file
 ```
 
 Remove a team member:
 ```bash
-lockbox team remove --key "age1..."
+lockbox team remove
+# Select team member to remove from the list
 ```
 
 List team members:
@@ -64,7 +77,29 @@ lockbox team list
 
 ### Encrypting and Decrypting Secrets
 
-(Coming soon)
+Encrypt a file:
+```bash
+lockbox secret encrypt
+# Enter file path and confirm encryption
+# File will be encrypted for all team members
+```
+
+Decrypt a file:
+```bash
+lockbox secret decrypt
+# Select which personal key to use for decryption
+```
+
+## Key Management
+
+Lockbox uses two locations for key storage:
+- `~/.lockbox/`: Stores your personal private/public key pairs
+- `./.lockbox/`: Stores team members' public keys for the current repository
+
+This means:
+1. Your private keys are safely stored in your home directory
+2. You can use the same keys across multiple repositories
+3. Each repository maintains its own team member list
 
 ## Development
 
@@ -121,49 +156,12 @@ lockbox/
 ├── internal/              # Private application code
 │   ├── crypto/           # Encryption operations
 │   ├── git/              # Git utilities
+│   ├── output/           # Colored output formatting
+│   ├── prompt/           # Interactive prompts
 │   └── commands/         # CLI commands
 ├── .github/              # GitHub Actions workflows
 └── Formula/              # Homebrew formula
 ```
-
-### Making Changes
-
-1. Create a new branch:
-```bash
-git checkout -b feature/your-feature
-```
-
-2. Make your changes and test:
-```bash
-make build
-./bin/lockbox --help
-```
-
-3. Run tests and linter:
-```bash
-make test
-make lint
-```
-
-4. Commit and push:
-```bash
-git commit -m "Add your feature"
-git push origin feature/your-feature
-```
-
-### Release Process
-
-1. Tag a new version:
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-2. GitHub Actions will automatically:
-- Run tests
-- Build binaries for all platforms
-- Create a GitHub release
-- Update the Homebrew formula
 
 ## Contributing
 
