@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/urfave/cli/v2"
-	"github.com/yourusername/lockbox/internal/git"
 	"github.com/yourusername/lockbox/internal/crypto"
+	"github.com/yourusername/lockbox/internal/git"
 	"github.com/yourusername/lockbox/internal/prompt"
 )
 

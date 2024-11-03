@@ -105,7 +105,7 @@ func (km *KeyManager) ListPersonalKeys() ([]Identity, error) {
 	var identities []Identity
 	for _, entry := range entries {
 		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
-			data, err := os.ReadFile(filepath.Join(keysDir, entry.Name()))
+			data, err := os.ReadFile(filepath.Clean(filepath.Join(keysDir, entry.Name())))
 			if err != nil {
 				continue
 			}
